@@ -3,6 +3,7 @@
 - 报告日期：2026-03-10
 - 分析范围：`docs/`、仓库源码、现网运行进程、端口探测、Postgres `Job` 数据、Redis/BullMQ 队列状态、Chroma 集合状态、GPU/CPU/内存快照
 - 结论口径：以当前仓库真实实现和当前环境真实运行数据为准，不以口头假设、泛化经验或“显卡应该很快”的直觉为准
+- 说明：本文同时保留了排障起点时的历史观察和文末“已修改的内容”。如果某处与当前代码默认值冲突，请以当前代码和第 19.1 节为准。
 
 ---
 
@@ -26,7 +27,7 @@
 | 1 | 视频主链路的主耗时不在聊天模型，而在视频索引本身 | 明确成立 |
 | 2 | `frame-analysis` 里最重的不是 YOLO，而是 `FaceRecognitionPlugin` 和 `DescriptorPlugin` | 明确成立 |
 | 3 | `scene-creation` 实际上是“每个采样帧直接变成一个 scene”，会把后半段 embedding 成本线性放大 | 明确成立 |
-| 4 | `visual-embedding` 和 `audio-embedding` 的 worker 全局并发都是 `1`，是明显队列瓶颈 | 明确成立 |
+| 4 | `visual-embedding` 和 `audio-embedding` 在排障起点时并发曾是 `1`，后续已提升到 `2`；后半段吞吐仍需持续压测 | 明确成立 |
 | 5 | worker 外层并发与 Python 内层真实吞吐没有打通，并发一高就容易放大等待时间 | 明确成立 |
 | 6 | 当前数据库统计已经证明，很多“慢”不是执行慢，而是排队/等待慢 | 明确成立 |
 | 7 | 当前失败热点集中在 `embedding_visual`，不是随机失败 | 明确成立 |
@@ -35,7 +36,7 @@
 
 一句话总结：
 
-**Edit Mind 现在慢，不是因为模型“太笨”，而是因为流水线把一个视频拆成了过多的 scene，又让最重的分析插件逐帧执行，同时把后半段 embedding 放在单 worker 队列里排队；结果是前半段重计算、后半段重排队，最终让总耗时被严重拉长。**
+**Edit Mind 现在慢，不是因为模型“太笨”，而是因为流水线把一个视频拆成了过多的 scene，又让最重的分析插件逐帧执行，同时把后半段 embedding 长时间排队；结果是前半段重计算、后半段重等待，最终让总耗时被严重拉长。**
 
 ---
 
@@ -244,19 +245,19 @@
 #### audio embedding
 
 - `apps/background-jobs/src/jobs/audioEmbedding.ts:46`
-- 并发固定为 `1`
+- 当前默认并发为 `2`
 
 #### visual embedding
 
 - `apps/background-jobs/src/jobs/visualEmbedding.ts:50`
-- 并发固定为 `1`
+- 当前默认并发为 `2`
 
 ### 4.2 Python 侧配置
 
 Python 分析配置：
 
 - `python/core/config.py:10`
-- `sample_interval_seconds = 2.5`
+- `sample_interval_seconds = 5.0`
 - `max_workers = 2`
 - `frame_buffer_limit = 2`
 
@@ -327,7 +328,7 @@ Python 分析配置：
 
 这和代码层的结构风险是吻合的：
 
-1. 全局 worker 并发 `1`
+1. 排障起点时全局 worker 并发为 `1`
 2. 内部 batch 又 `Promise.all`
 3. 每个 scene 还要 ffmpeg 抽 5 张图再跑 CLIP
 
@@ -383,7 +384,7 @@ Python 分析配置：
 
 这与默认采样策略是吻合的：
 
-- 长视频按 `2.5s` 一帧采样
+- 排障起点时的长视频样本按 `2.5s` 一帧采样
 - 一条约 40~45 分钟视频落在 900~1100 个采样点是正常的
 
 ### 6.2 插件级耗时
@@ -503,8 +504,8 @@ Python 分析配置：
 
 这看起来是并行优化，但问题在于：
 
-- `audio-embedding` worker 并发固定 `1`
-- `visual-embedding` worker 并发固定 `1`
+- 排障起点时 `audio-embedding` worker 并发固定为 `1`
+- 排障起点时 `visual-embedding` worker 并发固定为 `1`
 
 对应代码：
 
@@ -568,7 +569,7 @@ Python 分析配置：
 
 当前后半段是一个典型的“双层反模式”：
 
-1. 全局上，`audio/visual` worker 只有 `1`
+1. 排障起点时，全局上 `audio/visual` worker 只有 `1`
    - 导致多视频排长队
 2. 单个 worker 内，又对一个 batch 的 10 个 scene `Promise.all`
    - 导致单 worker 内部瞬时高峰过大
@@ -741,11 +742,11 @@ frame-analysis 慢的本质是：
 
 - 前半段持续高耗时
 
-### P1：`audio/visual embedding` 单 worker 队列瓶颈
+### P1：排障起点时的 `audio/visual embedding` 单 worker 队列瓶颈
 
 根因：
 
-- 全局并发固定 `1`
+- 排障起点时全局并发固定为 `1`
 
 影响：
 
@@ -1133,7 +1134,7 @@ frame-analysis 慢的本质是：
 2. **frame-analysis 过重**
    - 尤其是人脸和图像描述
 3. **后半段吞吐过低**
-   - `audio/visual` 全局 worker 并发只有 `1`
+   - `audio/visual` 全局 worker 默认并发虽已提升到 `2`，但仍容易形成排队
 4. **batch 峰值过高**
    - worker 内部又对 10 个 scene 全并发
 5. **上下游并发没打通**
@@ -1747,7 +1748,7 @@ frame-analysis 慢的本质是：
 
 - 机器虽然高配
 - 但应先从 `1 / 1` 跑通
-- `audio/visual embedding` 当前 worker 并发仍是 `1`
+- `audio/visual embedding` 当前默认 worker 并发已是 `2`
 - Node 并发调高，不等于端到端吞吐同步提升
 
 这与本次现网观察完全一致。
@@ -1757,7 +1758,7 @@ frame-analysis 慢的本质是：
 `docs/COMPLETE_ENVIRONMENT_ANALYSIS.md` 也已经指出：
 
 - GPU 对转录和视觉分析通常有明显帮助
-- 但端到端速度还受 `2.5s` 采样、多插件顺序执行、embedding 单 worker、Node/Python 并发未打通影响
+- 但端到端速度还受 `5s` 采样、多插件顺序执行、embedding 排队和 Node/Python 并发未打通影响
 
 这和本报告结论一致：
 
@@ -1811,11 +1812,11 @@ frame-analysis 慢的本质是：
 
 当前仓库真正决定总耗时的是：
 
-1. `2.5s` 一帧采样
+1. `5s` 一帧采样
 2. 每个采样帧都跑重插件
 3. 每个采样帧直接变一个 scene
 4. scene 后继续放大到文本、音频、视觉 embedding
-5. `audio/visual` worker 又固定并发 `1`
+5. `audio/visual` worker 默认并发虽然已是 `2`，但后半段仍可能形成排队
 
 所以：
 
@@ -2143,7 +2144,7 @@ frame-analysis 慢的本质是：
 那么对当前这类：
 
 - 长视频
-- 默认 `2.5s` 采样
+- 默认 `5s` 采样
 - 多视频批量导入
 
 的场景，理论上实现：
@@ -2204,7 +2205,7 @@ frame-analysis 慢的本质是：
 
 因此，最终结论可以收敛为一句话：
 
-**`docs/` 里的很多性能材料并不是“错”，而是“描述的是局部 benchmark、通用经验或未来扩展问题”；而当前系统真正拖慢端到端速度的，是 scene 放大、重插件逐帧执行、后半段单 worker 排队，以及流水线节拍不平衡。**
+**`docs/` 里的很多性能材料并不是“错”，而是“描述的是局部 benchmark、通用经验或未来扩展问题”；而当前系统真正拖慢端到端速度的，是 scene 放大、重插件逐帧执行、后半段低并发排队，以及流水线节拍不平衡。**
 
 ---
 
