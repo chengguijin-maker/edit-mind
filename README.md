@@ -117,6 +117,9 @@ HOST_MEDIA_PATH="/Users/yourusername/Videos"
 # 2. CHOOSE AI MODEL (Pick one option)
 # Option A: Use Ollama (more private, requires model download)
 USE_OLLAMA_MODEL="true"
+# macOS / Windows usually works with host.docker.internal
+# Linux should use a host address reachable from containers,
+# or add host-gateway mapping before using host.docker.internal
 OLLAMA_HOST="http://host.docker.internal"
 OLLAMA_PORT="11434"
 OLLAMA_MODEL="qwen2.5:7b-instruct"
@@ -130,6 +133,15 @@ OLLAMA_MODEL="qwen2.5:7b-instruct"
 # Option B: Use Gemini API (requires API key)
 USE_GEMINI="true"
 GEMINI_API_KEY="your-gemini-api-key-from-google-ai-studio"
+
+# 2.1 OPTIONAL: CONTROL VIDEO PROCESSING CONCURRENCY
+# Start conservatively, then tune upward after measuring
+MAX_CONCURRENT_TRANSCRIPTIONS="1"
+MAX_CONCURRENT_ANALYSES="1"
+
+# 2.2 OPTIONAL: DISABLE COSTLY EMBEDDING STAGES DURING TROUBLESHOOTING
+DISABLE_AUDIO_EMBEDDINGS="false"
+DISABLE_VISUAL_EMBEDDINGS="false"
 
 # 3. GENERATE SECURITY KEYS (REQUIRED)
 # Generate with: openssl rand -base64 32
