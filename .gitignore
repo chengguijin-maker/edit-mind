@@ -32,3 +32,4 @@ tsconfig.tsbuildinfo
 .pgdata
 playwright-auth-*.json
 .chroma
+.omc
