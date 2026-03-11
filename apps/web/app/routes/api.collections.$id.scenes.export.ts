@@ -13,13 +13,13 @@ export const action: ActionFunction = async ({ request, params }) => {
       return new Response(JSON.stringify({ error: 'Collection ID required' }), { status: 404 })
     }
 
-    const collection = await CollectionModel.findById(id)
+    const user = await requireUser(request)
+
+    const collection = await CollectionModel.findFirst({ where: { id, userId: user.id } })
 
     if (!collection) {
       return new Response(JSON.stringify({ error: 'Collection not found' }), { status: 404 })
     }
-
-    const user = await requireUser(request)
 
     const payload = await request.json()
 

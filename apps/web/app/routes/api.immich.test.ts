@@ -1,8 +1,11 @@
 import type { ActionFunctionArgs } from 'react-router'
 import { testImmichConnection } from '@immich/services/immich'
 import { ImmichConfigFormSchema } from '@immich/schemas/immich'
+import { requireUserId } from '~/services/user.server'
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireUserId(request)
+
   if (request.method !== 'POST') {
     return new Response(
       JSON.stringify({

@@ -38,9 +38,14 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   try {
+    const userId = await requireUserId(request)
     const { id } = params
 
     if (request.method === 'DELETE' && id) {
+      const project = await ProjectModel.findFirst({ where: { id, userId } })
+      if (!project) {
+        return new Response(JSON.stringify({ error: 'Project not found' }), { status: 404 })
+      }
       await ProjectModel.delete(id)
       return new Response(JSON.stringify({ message: 'Project is deleted' }), { status: 200 })
     }
@@ -58,6 +63,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     const { name, videoIds, instructions } = form.data
+    const existingProject = await ProjectModel.findFirst({ where: { id, userId } })
+    if (!existingProject) {
+      return new Response(JSON.stringify({ error: 'Project not found' }), { status: 404 })
+    }
     const project = await ProjectModel.update(id, {
       name,
       videoIds,

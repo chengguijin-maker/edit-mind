@@ -78,7 +78,13 @@ router.delete('/:id', async (req, res) => {
   const { id } = req.params
 
   try {
-    const folder = await FolderModel.findById(id)
+    const userId = req.userId
+    const folder = await FolderModel.findUnique({
+      where: {
+        id,
+        userId,
+      },
+    })
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' })
     }

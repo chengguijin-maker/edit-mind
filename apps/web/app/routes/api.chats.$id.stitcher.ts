@@ -13,13 +13,13 @@ export const action: ActionFunction = async ({ request, params }) => {
       return new Response(JSON.stringify({ error: 'Chat ID required' }), { status: 404 })
     }
 
-    const chat = await ChatModel.findById(chatId)
+    const user = await requireUser(request)
+
+    const chat = await ChatModel.findFirst({ where: { id: chatId, userId: user.id } })
 
     if (!chat) {
       return new Response(JSON.stringify({ error: 'Chat not found' }), { status: 404 })
     }
-
-    const user = await requireUser(request)
 
     const payload = await request.json()
 

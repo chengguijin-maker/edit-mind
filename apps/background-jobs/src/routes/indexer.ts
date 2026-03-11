@@ -68,6 +68,7 @@ router.post('/retry', async (req, res) => {
     const failedJobs = await JobModel.findMany({
       where: {
         status: 'error',
+        userId,
       },
     })
     await removeFailedJobs(failedJobs.map((job) => job.id))

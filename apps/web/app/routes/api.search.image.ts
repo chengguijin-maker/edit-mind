@@ -7,8 +7,10 @@ import { buildSearchQueryFromSuggestions } from '@search/services/suggestion'
 import { searchScenes } from '@search/services'
 import { combineResults } from '@search/services/hybridSearch'
 import { SearchTextSchema } from '~/features/search/schemas'
+import { requireUserId } from '~/services/user.server'
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireUserId(request)
   async function uploadHandler(fileUpload: FileUpload) {
     if (fileUpload.fieldName === 'image') {
       const url = new URL(request.url)

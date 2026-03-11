@@ -129,6 +129,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const video = await VideoModel.findFirst({
         where: {
           id,
+          userId: user.id,
         },
       })
       if (!video) {
@@ -162,9 +163,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         throw new Response('Video ID not found', { status: 404 })
       }
 
+      const userId = await requireUserId(request)
       const video = await VideoModel.findFirst({
         where: {
           id,
+          userId,
         },
       })
       if (!video) {
