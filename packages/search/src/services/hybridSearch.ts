@@ -112,30 +112,40 @@ export function combineAllResults(
   const { imageWeight, textWeight, hasQuery, boostFactor = 1.2, minScore = 0, maxResults, audioWeight } = options
 
   // Validate inputs
-  if (imageWeight < 0 || textWeight < 0) {
+  if (imageWeight < 0 || textWeight < 0 || (audioWeight || 0) < 0) {
     throw new Error('Weights must be non-negative')
   }
 
-  if (imageWeight + textWeight === 0) {
+  if (imageWeight + textWeight + (audioWeight || 0) === 0) {
     throw new Error('At least one weight must be greater than 0')
   }
 
   // Normalize weights to sum to 1
-  const totalWeight = imageWeight + textWeight
+  const totalWeight = imageWeight + textWeight + (audioWeight || 0)
   const normalizedImageWeight = imageWeight / totalWeight
   const normalizedTextWeight = textWeight / totalWeight
   const normalizedAudioWeight = (audioWeight || 0) / totalWeight
 
-  // Early return for image-only search
-  if (!hasQuery || textResults.length === 0) {
+  if (!hasQuery) {
     return normalizeResults(imageResults, 'image')
       .filter((result) => result.score >= minScore)
       .slice(0, maxResults)
   }
 
-  // Early return for text-only search (no image provided)
-  if (imageResults.length === 0) {
+  if (imageResults.length === 0 && textResults.length === 0) {
+    return normalizeResults(audioResults, 'audio')
+      .filter((result) => result.score >= minScore)
+      .slice(0, maxResults)
+  }
+
+  if (imageResults.length === 0 && audioResults.length === 0) {
     return normalizeResults(textResults, 'text')
+      .filter((result) => result.score >= minScore)
+      .slice(0, maxResults)
+  }
+
+  if (textResults.length === 0 && audioResults.length === 0) {
+    return normalizeResults(imageResults, 'image')
       .filter((result) => result.score >= minScore)
       .slice(0, maxResults)
   }
@@ -182,13 +192,17 @@ export function combineAllResults(
 /**
  * Normalize results using rank-based scoring
  */
-function normalizeResults(results: VideoWithScenesAndMatch[], matchType: 'image' | 'text'): HybridSearchResult[] {
+function normalizeResults(results: VideoWithScenesAndMatch[], matchType: 'image' | 'text' | 'audio'): HybridSearchResult[] {
   return results.map((result, index) => {
     const normalizedScore = calculateRankScore(index, results.length)
     return {
       ...result,
       score: normalizedScore,
-      ...(matchType === 'image' ? { imageScore: normalizedScore } : { textScore: normalizedScore }),
+      ...(matchType === 'image'
+        ? { imageScore: normalizedScore }
+        : matchType === 'audio'
+          ? { audioScore: normalizedScore }
+          : { textScore: normalizedScore }),
       matchType,
     }
   })
@@ -245,13 +259,14 @@ function processResults(
  */
 function applyHybridBoost(results: HybridSearchResult[], boostFactor: number): HybridSearchResult[] {
   return results.map((result) => {
-    const isHybrid = result.imageScore !== undefined && result.textScore !== undefined && result.audioScore
+    const matchedModalities = [result.imageScore, result.textScore, result.audioScore].filter(
+      (score) => score !== undefined
+    ).length
 
-    if (isHybrid) {
+    if (matchedModalities >= 2) {
       result.matchType = 'hybrid'
       result.score *= boostFactor
-    }
-    if (result.audioScore) {
+    } else if (result.audioScore !== undefined) {
       result.matchType = 'audio'
     } else if (result.imageScore !== undefined) {
       result.matchType = 'image'

@@ -7,16 +7,23 @@ export function collectScenesFromQuery(
   scenesIds: Set<string>,
   finalScenes: Scene[]
 ) {
-  for (let i = 0; i < vectorQuery.metadatas.length; i++) {
-    const metadata = vectorQuery.metadatas[i][0]
-    const id = vectorQuery.ids[i][0]
-    const text = vectorQuery.documents[i][0]
+  for (let queryIndex = 0; queryIndex < vectorQuery.metadatas.length; queryIndex++) {
+    const queryMetadatas = vectorQuery.metadatas[queryIndex] || []
+    const queryIds = vectorQuery.ids[queryIndex] || []
+    const queryDocuments = vectorQuery.documents?.[queryIndex] || []
 
-    if (!metadata || !id || !text) continue
+    for (let resultIndex = 0; resultIndex < queryMetadatas.length; resultIndex++) {
+      const metadata = queryMetadatas[resultIndex]
+      const id = queryIds[resultIndex]
+      const text = queryDocuments[resultIndex]
 
-    const scene = metadataToScene(metadata, id, text)
-    if (scenesIds.has(scene.id)) return
-    scenesIds.add(scene.id)
-    finalScenes.push(scene)
+      if (!metadata || !id || !text) continue
+
+      const scene = metadataToScene(metadata, id, text)
+      if (scenesIds.has(scene.id)) continue
+
+      scenesIds.add(scene.id)
+      finalScenes.push(scene)
+    }
   }
 }
