@@ -272,7 +272,7 @@ export async function getScenesByYear(year: number): Promise<{
       shortestScene: { duration: Infinity, description: '', videoSource: '' },
       totalDuration: 0,
     }
-    const scenes = []
+    const scenes: Scene[] = []
 
     for (let i = 0; i < allDocs.metadatas.length; i++) {
       const metadata = allDocs.metadatas[i]
@@ -285,70 +285,55 @@ export async function getScenesByYear(year: number): Promise<{
 
       const scene: Scene = metadataToScene(metadata, allDocs.ids[i], allDocs.documents[i])
       scenes.push(scene)
-    }
-    if (allDocs && allDocs.metadatas && allDocs.ids) {
-      for (let i = 0; i < allDocs.metadatas.length; i++) {
-        const metadata = allDocs.metadatas[i]
-        if (!metadata) continue
 
-        const createdAt = metadata.createdAt
-        if (!createdAt) continue
+      const sceneDuration = scene.endTime - scene.startTime
 
-        const scene: Scene = metadataToScene(metadata, allDocs.ids[i], allDocs.documents[i])
-        const sceneDuration = scene.endTime - scene.startTime
-
-        if (sceneDuration > globalStats.longestScene.duration) {
-          globalStats.longestScene = {
-            duration: sceneDuration,
-            description: scene.description || '',
-            videoSource: metadata.source?.toString() || '',
-          }
+      if (sceneDuration > globalStats.longestScene.duration) {
+        globalStats.longestScene = {
+          duration: sceneDuration,
+          description: scene.description || '',
+          videoSource: source,
         }
+      }
 
-        if (sceneDuration < globalStats.shortestScene.duration && sceneDuration > 0) {
-          globalStats.shortestScene = {
-            duration: sceneDuration,
-            description: scene.description || '',
-            videoSource: metadata.source?.toString() || '',
-          }
+      if (sceneDuration < globalStats.shortestScene.duration && sceneDuration > 0) {
+        globalStats.shortestScene = {
+          duration: sceneDuration,
+          description: scene.description || '',
+          videoSource: source,
         }
+      }
 
-        globalStats.totalDuration += sceneDuration
+      globalStats.totalDuration += sceneDuration
 
-        scene.emotions?.forEach((e) => {
-          const emotion = e.emotion
-          if (emotion.toLocaleLowerCase().includes('n/a')) return
-          globalStats.totalEmotions.set(emotion, (globalStats.totalEmotions.get(emotion) || 0) + 1)
-        })
+      scene.emotions?.forEach((e) => {
+        const emotion = e.emotion
+        if (emotion.toLocaleLowerCase().includes('n/a')) return
+        globalStats.totalEmotions.set(emotion, (globalStats.totalEmotions.get(emotion) || 0) + 1)
+      })
 
-        scene.transcriptionWords?.forEach((e) => {
-          const word = e.word
-          if (word.toLocaleLowerCase().includes('n/a')) return
-          globalStats.totalWords.set(word, (globalStats.totalWords.get(word) || 0) + 1)
-        })
-        scene.objects?.forEach((obj) => {
-          if (obj.toLocaleLowerCase().includes('person')) return
-          globalStats.totalObjects.set(obj, (globalStats.totalObjects.get(obj) || 0) + 1)
-        })
+      scene.transcriptionWords?.forEach((e) => {
+        const word = e.word
+        if (word.toLocaleLowerCase().includes('n/a')) return
+        globalStats.totalWords.set(word, (globalStats.totalWords.get(word) || 0) + 1)
+      })
+      scene.objects?.forEach((obj) => {
+        if (obj.toLocaleLowerCase().includes('person')) return
+        globalStats.totalObjects.set(obj, (globalStats.totalObjects.get(obj) || 0) + 1)
+      })
 
-        scene.faces?.forEach((face) => {
-          if (face.toLocaleLowerCase().includes('unknown')) return
-          globalStats.totalFaces.set(face, (globalStats.totalFaces.get(face) || 0) + 1)
-        })
+      scene.faces?.forEach((face) => {
+        if (face.toLocaleLowerCase().includes('unknown')) return
+        globalStats.totalFaces.set(face, (globalStats.totalFaces.get(face) || 0) + 1)
+      })
 
-        if (scene.shotType) {
-          globalStats.totalShotTypes.set(scene.shotType, (globalStats.totalShotTypes.get(scene.shotType) || 0) + 1)
-        }
+      if (scene.shotType) {
+        globalStats.totalShotTypes.set(scene.shotType, (globalStats.totalShotTypes.get(scene.shotType) || 0) + 1)
+      }
 
-        if (metadata.category) {
-          const category = metadata.category.toString()
-          globalStats.totalCategories.set(category, (globalStats.totalCategories.get(category) || 0) + 1)
-        }
-
-        const source = metadata.source?.toString()
-        if (source) {
-          scenes.push(scene)
-        }
+      if (metadata.category) {
+        const category = metadata.category.toString()
+        globalStats.totalCategories.set(category, (globalStats.totalCategories.get(category) || 0) + 1)
       }
     }
 

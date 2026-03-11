@@ -50,9 +50,15 @@ export function applyFilters(
   }
 
   if (query.emotions?.length > 0) {
-    for (const emotion of query.emotions) {
+    if (query.emotions.length === 1) {
       documentConditions.push({
-        $contains: emotion,
+        $contains: query.emotions[0],
+      })
+    } else {
+      documentConditions.push({
+        $or: query.emotions.map((emotion) => ({
+          $contains: emotion,
+        })),
       })
     }
   }
