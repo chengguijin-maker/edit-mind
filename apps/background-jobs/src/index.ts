@@ -67,7 +67,11 @@ export const io = new Server(server, {
   },
 })
 
-app.use(cors())
+app.use(cors({
+  origin: env.WEB_APP_URL,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}))
 app.use(express.json())
 
 if (process.env.NODE_ENV === 'development') {

@@ -88,14 +88,15 @@ services:
     env_file:
       - .env.system
       - .env
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --requirepass "${REDIS_PASSWORD:-changeme}"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
