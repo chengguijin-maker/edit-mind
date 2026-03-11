@@ -1,6 +1,7 @@
 import { createVectorDbClient } from '@vector/services/client'
-import { VISUAL_BATCH_SIZE } from '@shared/constants/embedding'
+import { VISUAL_BATCH_CONCURRENCY, VISUAL_BATCH_SIZE, VISUAL_FRAMES_PER_SCENE } from '@shared/constants/embedding'
 import { logger } from '@shared/services/logger'
+import { mapWithConcurrencyLimit } from '@shared/utils/concurrency'
 import { cleanupFrames, extractSceneFrames } from '@media-utils/utils/frame'
 import { embedSceneFrames } from '../services'
 import { Scene } from '@shared/schemas'
@@ -18,34 +19,36 @@ export const embedVisualScenes = async (scenes: Scene[], videoFullPath: string):
       const batch = scenes.slice(i, i + VISUAL_BATCH_SIZE)
       logger.info(`Processing batch ${i / VISUAL_BATCH_SIZE + 1}, scenes ${i} to ${i + batch.length - 1}`)
 
-      const visualEmbeddingsPromise = batch.map(async (scene) => {
-        try {
-          const startTime = Date.now()
-          const keyframes = await extractSceneFrames(scene.source, scene.startTime, scene.endTime, {
-            framesPerScene: 5,
-            format: 'jpg',
-            quality: 2,
-            maxWidth: 640,
-          })
+      const visualEmbeddingsResults = await mapWithConcurrencyLimit(
+        batch,
+        VISUAL_BATCH_CONCURRENCY,
+        async (scene) => {
+          try {
+            const startTime = Date.now()
+            const keyframes = await extractSceneFrames(scene.source, scene.startTime, scene.endTime, {
+              framesPerScene: VISUAL_FRAMES_PER_SCENE,
+              format: 'jpg',
+              quality: 2,
+              maxWidth: 640,
+            })
 
-          const endTime = Date.now()
+            const endTime = Date.now()
 
-          logger.info(`Frames extracted in ${(endTime - startTime) / 1000}s`)
+            logger.info(`Frames extracted in ${(endTime - startTime) / 1000}s`)
 
-          const { metadata, id } = await sceneToVectorFormat(scene)
+            const { metadata, id } = await sceneToVectorFormat(scene)
 
-          const embedding = await embedSceneFrames(keyframes)
+            const embedding = await embedSceneFrames(keyframes)
 
-          await cleanupFrames(keyframes)
+            await cleanupFrames(keyframes)
 
-          return { id, embedding, metadata, success: true }
-        } catch (error) {
-          logger.error(`Failed to process visual embedding for scene ${scene.id}: ${error}`)
-          return { id: scene.id, embedding: null, metadata: {}, success: false }
+            return { id, embedding, metadata, success: true }
+          } catch (error) {
+            logger.error(`Failed to process visual embedding for scene ${scene.id}: ${error}`)
+            return { id: scene.id, embedding: null, metadata: {}, success: false }
+          }
         }
-      })
-
-      const visualEmbeddingsResults = await Promise.all(visualEmbeddingsPromise)
+      )
 
       const validVisualEmbeddings = visualEmbeddingsResults.filter((r) => r.success && r.embedding)
 

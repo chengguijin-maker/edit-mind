@@ -116,12 +116,12 @@ class PluginManager:
 
         return frame_analysis
 
-    def _should_run_plugin(self, plugin: AnalyzerPlugin, video_path: int) -> bool:
+    def _should_run_plugin(self, plugin: AnalyzerPlugin, frame_idx: int) -> bool:
         """Determine if plugin should run on this frame."""
         plugin_name = plugin.__class__.__name__
 
         # Critical plugins always run
-        critical_plugins = ['FaceRecognitionPlugin', 'ObjectDetectionPlugin']
+        critical_plugins = ['ObjectDetectionPlugin']
         if plugin_name in critical_plugins:
             return True
 
@@ -132,8 +132,12 @@ class PluginManager:
             self.frame_counters[plugin_name] = 0
 
         self.frame_counters[plugin_name] += 1
+        frame_count = self.frame_counters[plugin_name]
 
-        return self.frame_counters[plugin_name] % skip_interval == 0
+        if skip_interval <= 1:
+            return True
+
+        return (frame_count - 1) % skip_interval == 0
 
     def _execute_plugin(
         self,

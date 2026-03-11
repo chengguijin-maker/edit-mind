@@ -54,8 +54,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--sample-interval",
         type=float,
-        default=2.5,
-        help="Frame sampling interval in seconds (default: 2.5)"
+        default=5.0,
+        help="Frame sampling interval in seconds (default: 5.0)"
     )
     parser.add_argument(
         "--target-resolution",

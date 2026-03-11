@@ -6,7 +6,7 @@ import { logger } from '@shared/services/logger'
 import { VideoProcessingData } from '@shared/types/video'
 import { embedVisualScenes } from '@embedding-media/utils/visualEmbedding'
 import { updateJob } from '../services/videoIndexer'
-import { VISUAL_EMBEDDINGS_DISABLED } from '@shared/constants/embedding'
+import { VISUAL_EMBEDDINGS_DISABLED, VISUAL_EMBEDDING_WORKER_CONCURRENCY } from '@shared/constants/embedding'
 
 async function processVideo(job: Job<VideoProcessingData>) {
   const { videoPath, jobId, scenesPath } = job.data
@@ -49,7 +49,7 @@ async function processVideo(job: Job<VideoProcessingData>) {
 
 export const visualEmbeddingWorker = new Worker('visual-embedding', processVideo, {
   connection,
-  concurrency: 1,
+  concurrency: VISUAL_EMBEDDING_WORKER_CONCURRENCY,
   lockDuration: 6 * 60 * 60 * 1000, // 6 hours
   stalledInterval: 2 * 60 * 1000,
   maxStalledCount: 3,

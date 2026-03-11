@@ -1,4 +1,5 @@
 import { logger } from '@shared/services/logger'
+import { isGPUAvailable } from '@shared/utils/gpu'
 import { withTimeout } from '@vector/utils/shared'
 import {
   EMBEDDING_TIMEOUT,
@@ -11,7 +12,6 @@ import {
 import type { PreTrainedModel, Processor, PreTrainedTokenizer, FeatureExtractionPipeline } from '@huggingface/transformers'
 import { AutoProcessor, AutoTokenizer, ClapAudioModelWithProjection, ClapTextModelWithProjection, CLIPTextModelWithProjection, CLIPVisionModelWithProjection, env, pipeline, RawImage } from '@huggingface/transformers'
 import { accessSync, existsSync, mkdirSync, constants } from 'node:fs'
-import { USE_GPU } from '@shared/constants/gpu'
 
 // Set the cache directory for Xenova Transformers models
 try {
@@ -35,14 +35,29 @@ let visualModelCache: { processor: Processor; model: PreTrainedModel } | null = 
 let audioModelCache: { processor: Processor; model: PreTrainedModel } | null = null
 let textToVisualModelCache: { tokenizer: PreTrainedTokenizer; model: PreTrainedModel } | null = null
 let textToAudioModelCache: { tokenizer: PreTrainedTokenizer; model: PreTrainedModel } | null = null
+let embeddingDevicePromise: Promise<'cuda' | 'cpu'> | null = null
+
+async function getEmbeddingDevice(): Promise<'cuda' | 'cpu'> {
+  if (!embeddingDevicePromise) {
+    embeddingDevicePromise = (async () => {
+      const useGpu = await isGPUAvailable()
+      const device = useGpu ? 'cuda' : 'cpu'
+      logger.info({ device }, 'Resolved embedding device')
+      return device
+    })()
+  }
+
+  return embeddingDevicePromise
+}
 
 export async function getFrameExtractor() {
   if (!visualModelCache) {
+    const device = await getEmbeddingDevice()
 
     const processor = await AutoProcessor.from_pretrained(VISUAL_EMBEDDING_MODEL)
     const model = await CLIPVisionModelWithProjection.from_pretrained(VISUAL_EMBEDDING_MODEL, {
-      device: USE_GPU ? "cuda" : "cpu",
-      dtype: "fp16"
+      device,
+      dtype: device === 'cuda' ? 'fp16' : undefined,
     })
     visualModelCache = { processor, model }
   }
@@ -51,9 +66,10 @@ export async function getFrameExtractor() {
 
 export async function getAudioExtractor() {
   if (!audioModelCache) {
+    const device = await getEmbeddingDevice()
     const processor = await AutoProcessor.from_pretrained(AUDIO_EMBEDDING_MODEL)
     const model = await ClapAudioModelWithProjection.from_pretrained(AUDIO_EMBEDDING_MODEL, {
-      device: USE_GPU ? "cuda" : "cpu"
+      device,
     })
 
     audioModelCache = { processor, model }
@@ -63,11 +79,12 @@ export async function getAudioExtractor() {
 
 async function getTextToVisualExtractor() {
   if (!textToVisualModelCache) {
+    const device = await getEmbeddingDevice()
 
     const tokenizer = await AutoTokenizer.from_pretrained(VISUAL_EMBEDDING_MODEL)
     const model = await CLIPTextModelWithProjection.from_pretrained(VISUAL_EMBEDDING_MODEL, {
-      device: USE_GPU ? "cuda" : "cpu",
-      dtype: "fp16"
+      device,
+      dtype: device === 'cuda' ? 'fp16' : undefined,
     })
     textToVisualModelCache = { tokenizer, model }
   }
@@ -76,10 +93,11 @@ async function getTextToVisualExtractor() {
 
 async function getTextToAudioExtractor() {
   if (!textToAudioModelCache) {
+    const device = await getEmbeddingDevice()
 
     const tokenizer = await AutoTokenizer.from_pretrained(AUDIO_EMBEDDING_MODEL)
     const model = await ClapTextModelWithProjection.from_pretrained(AUDIO_EMBEDDING_MODEL, {
-      device: USE_GPU ? "cuda" : "cpu",
+      device,
     })
     textToAudioModelCache = { tokenizer, model }
   }
@@ -120,10 +138,11 @@ export async function getImageEmbedding(imageBuffer: Buffer): Promise<number[]> 
 
 export async function getTextExtractor() {
   if (!textModelCache) {
+    const device = await getEmbeddingDevice()
 
     const embed = await pipeline('feature-extraction', TEXT_EMBEDDING_MODEL, {
-      device: USE_GPU ? "cuda" : "cpu",
-      dtype: "fp16"
+      device,
+      dtype: device === 'cuda' ? 'fp16' : undefined,
     })
 
     textModelCache = { embed }

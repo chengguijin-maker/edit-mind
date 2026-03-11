@@ -6,7 +6,7 @@ import { logger } from '@shared/services/logger'
 import { VideoProcessingData } from '@shared/types/video'
 import { embedAudioScenes } from '@embedding-media/utils/audioEmbedding'
 import { updateJob } from '../services/videoIndexer'
-import { AUDIO_EMBEDDINGS_DISABLED } from '@shared/constants/embedding'
+import { AUDIO_EMBEDDINGS_DISABLED, AUDIO_EMBEDDING_WORKER_CONCURRENCY } from '@shared/constants/embedding'
 
 async function processVideo(job: Job<VideoProcessingData>) {
   const { videoPath, jobId, scenesPath } = job.data
@@ -45,7 +45,7 @@ async function processVideo(job: Job<VideoProcessingData>) {
 
 export const audioEmbeddingWorker = new Worker('audio-embedding', processVideo, {
   connection,
-  concurrency: 1,
+  concurrency: AUDIO_EMBEDDING_WORKER_CONCURRENCY,
   lockDuration: 6 * 60 * 60 * 1000, // 6 hours
   stalledInterval: 2 * 60 * 1000,
   maxStalledCount: 3,

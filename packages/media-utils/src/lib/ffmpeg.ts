@@ -1,26 +1,41 @@
 import { chmod } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, statSync } from 'fs'
 import { spawn, ChildProcess } from 'child_process'
 import { logger } from '@shared/services/logger'
 import { FFmpegError } from '@media-utils/types/video'
 import { FFMPEG_PATH, FFPROBE_PATH } from '@media-utils/constants'
 
+const validatedBinaries = new Set<string>()
+const chmodWarnings = new Set<string>()
+
 const ensureBinaryPermissions = async (binaryPath: string): Promise<void> => {
   try {
-    if (existsSync(binaryPath)) {
-      await chmod(binaryPath, 0o755)
-    }
+    if (!existsSync(binaryPath)) return
+
+    const stat = statSync(binaryPath)
+
+    // Skip chmod when the binary is already executable.
+    if ((stat.mode & 0o111) !== 0) return
+
+    await chmod(binaryPath, 0o755)
   } catch (error) {
-    logger.warn(`Failed to set permissions for ${binaryPath}:` + error)
+    if (!chmodWarnings.has(binaryPath)) {
+      chmodWarnings.add(binaryPath)
+      logger.warn(`Failed to set permissions for ${binaryPath}:` + error)
+    }
   }
 }
 
 const validateBinary = async (binaryPath: string, name: string): Promise<void> => {
+  if (validatedBinaries.has(binaryPath)) return
+
   await ensureBinaryPermissions(binaryPath)
 
   if (!existsSync(binaryPath)) {
     throw new Error(`${name} binary not found at path: ${binaryPath}`)
   }
+
+  validatedBinaries.add(binaryPath)
 }
 
 export const validateBinaries = async (): Promise<void> => {
