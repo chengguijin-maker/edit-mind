@@ -1,4 +1,5 @@
 import { logger } from '@shared/services/logger'
+import prisma from '@db/db'
 import { audioEmbeddingWorker } from '../jobs/audioEmbedding'
 import { chatWorker } from '../jobs/chat'
 import { exportWorker } from '../jobs/export'
@@ -32,6 +33,7 @@ export async function shutdownWorkers() {
         ])
 
         logger.info('All workers closed successfully')
+        await prisma.$disconnect()
     } catch (error) {
         logger.error({ error })
     } finally {
