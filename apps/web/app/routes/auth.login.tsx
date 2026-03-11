@@ -3,14 +3,21 @@ import { FormInput } from '~/features/auth/components/FormInput'
 import { SubmitButton } from '~/features/auth/components/SubmitButton'
 import { LoginSchema } from '~/features/auth/schemas/auth'
 import { AuthHeader } from '~/features/auth/components/AuthHeader'
-import { Link, useActionData, useNavigation, type ActionFunctionArgs, type MetaFunction } from 'react-router'
+import { Link, useActionData, useNavigation, data, type ActionFunctionArgs, type MetaFunction } from 'react-router'
 import { login } from '~/services/auth.server'
+import { checkRateLimit } from '~/utils/rateLimit.server'
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Login | Edit Mind' }]
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const { allowed } = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)
+  if (!allowed) {
+    throw data({ error: 'Too many login attempts. Please try again later.' }, { status: 429 })
+  }
+
   const formData = await request.formData()
   const values = Object.fromEntries(formData)
 

@@ -3,14 +3,21 @@ import { FormInput } from '~/features/auth/components/FormInput'
 import { SubmitButton } from '~/features/auth/components/SubmitButton'
 import { RegisterSchema } from '~/features/auth/schemas/auth';
 import { AuthHeader } from '~/features/auth/components/AuthHeader'
-import { Link, useActionData, useNavigation, type ActionFunctionArgs, type MetaFunction } from 'react-router'
+import { Link, useActionData, useNavigation, data, type ActionFunctionArgs, type MetaFunction } from 'react-router'
 import { register } from '~/services/auth.server';
+import { checkRateLimit } from '~/utils/rateLimit.server';
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Register | Edit Mind' }]
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const { allowed } = checkRateLimit(`register:${ip}`, 5, 15 * 60 * 1000)
+  if (!allowed) {
+    throw data({ error: 'Too many registration attempts. Please try again later.' }, { status: 429 })
+  }
+
   const formData = await request.formData()
   const values = Object.fromEntries(formData)
 
