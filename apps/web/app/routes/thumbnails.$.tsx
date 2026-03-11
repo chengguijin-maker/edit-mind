@@ -21,27 +21,32 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     const validation = pathValidator.validatePath(decodedPath)
 
     if (!validation.isValid) {
-      logger.warn(`Path validation failed: ${path} - ${validation.error}`)
+      logger.warn(`Path validation failed: ${decodedPath} - ${validation.error}`)
       throw new Response('Access denied', { status: 403 })
     }
 
-    if (!fs.existsSync(decodedPath)) {
+    const safePath = path.resolve(THUMBNAILS_DIR, decodedPath.replace(/^\\/+/, ''))
+    if (!safePath.startsWith(THUMBNAILS_DIR)) {
+      throw new Response('Access denied', { status: 403 })
+    }
+
+    if (!fs.existsSync(safePath)) {
       throw new Response('File not found', { status: 404 })
     }
 
-    const stats = fs.statSync(decodedPath)
+    const stats = fs.statSync(safePath)
     if (!stats.isFile()) throw new Response('Not a file', { status: 400 })
 
-    const contentType = getContentType(decodedPath)
+    const contentType = getContentType(safePath)
 
-    const etag = generateEtag(decodedPath, stats)
+    const etag = generateEtag(safePath, stats)
 
     const ifNoneMatch = request.headers.get('If-None-Match')
     if (ifNoneMatch === etag) {
       return new Response(null, { status: 304 })
     }
 
-    const stream = fs.createReadStream(decodedPath)
+    const stream = fs.createReadStream(safePath)
 
     return new Response(stream as unknown as ReadableStream, {
       status: 200,

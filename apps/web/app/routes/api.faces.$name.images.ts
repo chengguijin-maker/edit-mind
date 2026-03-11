@@ -1,8 +1,10 @@
 import { logger } from '@shared/services/logger'
 import { getImagesByPersonName } from '@shared/utils/faces'
 import type { LoaderFunctionArgs } from 'react-router'
+import { requireUserId } from '~/services/user.server'
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  await requireUserId(request)
   const { name } = params
 
   try {

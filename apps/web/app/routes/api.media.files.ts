@@ -5,6 +5,7 @@ import { MEDIA_BASE_PATH } from '@shared/constants'
 import { SUPPORTED_VIDEO_EXTENSIONS } from '@shared/constants'
 import { logger } from '@shared/services/logger'
 import { createPathValidator } from '@shared/services/pathValidator'
+import { requireUserId } from '~/services/user.server'
 
 const pathValidator = createPathValidator(MEDIA_BASE_PATH)
 
@@ -15,6 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const search = url.searchParams.get('search')?.toLowerCase() || ''
 
   try {
+    await requireUserId(request)
     const validation = pathValidator.validatePath(path)
 
     if (!validation.isValid) {

@@ -1,4 +1,5 @@
 import { createPathValidator } from '@shared/services/pathValidator'
+import { requireUserId } from '~/services/user.server'
 import pathModule from 'path'
 import fs from 'fs/promises'
 import { logger } from '@shared/services/logger'
@@ -13,6 +14,7 @@ export async function loader({ request }: { request: Request }) {
     const search = url.searchParams.get('search')?.toLowerCase() || ''
 
     try {
+        await requireUserId(request)
         const validation = pathValidator.validatePath(path)
 
         if (!validation.isValid) {
