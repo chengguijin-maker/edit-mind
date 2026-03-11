@@ -28,7 +28,7 @@ export async function register(request: Request, values: z.infer<typeof Register
   const user = await UserModel.create({
     email: values.email,
     password: values.confirmationPassword,
-    role: "admin",
+    role: "user",
     name: values.name
   })
   const session = await getSession(request.headers.get('Cookie'))

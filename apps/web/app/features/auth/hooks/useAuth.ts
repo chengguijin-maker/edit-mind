@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useFetcher } from 'react-router'
+import { useFetcher } from 'react-router'
 import { useSession } from './useSession'
 import type { LoginFormValues } from '~/types/auth'
 
 export function useAuth() {
-  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
 
   const { setSession } = useSession()
@@ -25,7 +24,8 @@ export function useAuth() {
     try {
       await fetch('/auth/logout', { method: 'POST' })
       setSession({ isAuthenticated: false, user: null })
-      navigate('/auth/login')
+      localStorage.clear()
+      window.location.href = '/auth/login'
     } catch {
       setError('Failed to logout')
     }
