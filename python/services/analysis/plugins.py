@@ -83,12 +83,19 @@ class PluginManager:
 
     def _load_plugins_models(self) -> None:
         """Initialize all plugins models"""
+        failed_plugins = []
         for plugin in self.plugins:
             try:
                 plugin.load_models()
             except Exception as e:
                 logger.error(
                     f"Failed to load {plugin.__class__.__name__} models: {e}")
+                failed_plugins.append(plugin)
+        for plugin in failed_plugins:
+            logger.warning(f"Removing plugin {plugin.__class__.__name__} due to model load failure")
+            self.plugins.remove(plugin)
+        if failed_plugins:
+            logger.warning(f"Analysis will run with {len(self.plugins)} of {len(self.plugins) + len(failed_plugins)} plugins")
                 
     def process_frame(
         self,

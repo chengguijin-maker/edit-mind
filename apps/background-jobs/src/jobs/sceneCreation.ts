@@ -119,10 +119,11 @@ export const sceneCreationWorker = new Worker('scene-creation', processVideo, {
   lockRenewTime: 30 * 1000,
 })
 
-const flowProducer = new FlowProducer({ connection })
+export const flowProducer = new FlowProducer({ connection })
 
 sceneCreationWorker.on('completed', async (job: Job<VideoProcessingData>) => {
-  await flowProducer.add({
+  try {
+    await flowProducer.add({
     name: 'video-finalization-flow',
     queueName: 'video-finalization',
     data: job.data,
@@ -160,4 +161,7 @@ sceneCreationWorker.on('completed', async (job: Job<VideoProcessingData>) => {
       },
     ],
   })
+  } catch (error) {
+    logger.error({ error, jobId: job.data.jobId }, 'Failed to add video finalization flow')
+  }
 })

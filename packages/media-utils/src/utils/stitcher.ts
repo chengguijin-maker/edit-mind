@@ -16,12 +16,12 @@ const DEFAULT_FPS = 30
 const DEFAULT_OUTPUT_DIR = 'output-videos'
 const STANDARD_DIMENSION = 1080
 
-const validateScenes = (scenes: ExportedScene[]) => {
+const validateScenes = (scenes: ExportedScene[]): ExportedScene[] => {
   if (scenes.length === 0) {
     throw new Error('At least one scene is required for stitching')
   }
 
-  scenes
+  return scenes
     .map((scene, index) => {
       if (!scene.source) {
         throw new Error(`Scene ${index}: source path is required`)
@@ -35,8 +35,7 @@ const validateScenes = (scenes: ExportedScene[]) => {
       }
       return scene
     })
-    .filter((scene) => scene !== null)
-  return scenes
+    .filter((scene): scene is ExportedScene => scene !== null)
 }
 
 const validateOutputFileName = (fileName: string): void => {
